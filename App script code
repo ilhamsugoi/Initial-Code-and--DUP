@@ -1,0 +1,103 @@
+function onEdit(e) {
+  // Mendapatkan range yang diedit
+  var range = e.range;
+  var sheet = range.getSheet();
+  
+  // Cek apakah edit terjadi di kolom E (Receipt Number) dan baris >= 2
+  if (range.getColumn() == 5 && range.getRow() >= 2) {
+    // Mendapatkan nilai yang diinput
+    var inputValue = range.getValue();
+    
+    // Jika nilai kosong, keluar dari fungsi
+    if (!inputValue) return;
+    
+    // Hapus prefix TIC- dan suffix -DUP jika sudah ada
+    var cleanValue = inputValue.replace(/^TIC-/, '').replace(/-DUP$/, '');
+    
+    // Mendapatkan SEMUA nilai di kolom Receipt Number
+    var allReceiptColumn = sheet.getRange("E2:E" + sheet.getLastRow()).getValues();
+    
+    // Hitung berapa kali nilai ini muncul di seluruh kolom
+    var count = 0;
+    for (var i = 0; i < allReceiptColumn.length; i++) {
+      var existingValue = allReceiptColumn[i][0].toString().replace(/^TIC-/, '').replace(/-DUP$/, '');
+      if (existingValue === cleanValue) {
+        count++;
+      }
+    }
+    
+    // Format nilai baru
+    var newValue = "TIC-" + cleanValue;
+    if (count > 1) {
+      newValue += "-DUP";
+    }
+    
+    // Update sel dengan nilai yang sudah diformat
+    range.setValue(newValue);
+  }
+}
+
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('Format Receipt')
+    .addItem('Format Semua', 'formatAll')
+    .addSeparator()
+    .addItem('Aktif/Nonaktifkan Script', 'toggleScript')
+    .addToUi();
+}
+
+// Fungsi untuk memformat ulang semua data
+function formatAll() {
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var startRow = 2; // Mulai dari baris 2
+  var lastRow = sheet.getLastRow();
+  
+  // Mendapatkan SEMUA nilai untuk pengecekan duplikat
+  var allReceiptColumn = sheet.getRange("E2:E" + lastRow).getValues();
+  
+  // Membuat map untuk menghitung kemunculan setiap nilai
+  var valueCounts = {};
+  
+  // Hitung kemunculan setiap nilai
+  for (var i = 0; i < allReceiptColumn.length; i++) {
+    var value = allReceiptColumn[i][0];
+    if (value) {
+      var cleanValue = value.toString().replace(/^TIC-/, '').replace(/-DUP$/, '');
+      valueCounts[cleanValue] = (valueCounts[cleanValue] || 0) + 1;
+    }
+  }
+  
+  // Terapkan format
+  for (var i = 0; i < allReceiptColumn.length; i++) {
+    var value = allReceiptColumn[i][0];
+    if (value) {
+      var cleanValue = value.toString().replace(/^TIC-/, '').replace(/-DUP$/, '');
+      var newValue = "TIC-" + cleanValue;
+      if (valueCounts[cleanValue] > 1) {
+        newValue += "-DUP";
+      }
+      sheet.getRange(startRow + i, 5).setValue(newValue);
+    }
+  }
+}
+
+// Fungsi untuk mengaktifkan/nonaktifkan script
+var SCRIPT_ENABLED = true; // Variabel toggle untuk mengaktifkan/nonaktifkan script
+
+// Properti script untuk menyimpan status
+function setScriptStatus(enabled) {
+  PropertiesService.getScriptProperties().setProperty('scriptEnabled', enabled.toString());
+}
+
+function getScriptStatus() {
+  return PropertiesService.getScriptProperties().getProperty('scriptEnabled') === 'true';
+}
+
+function toggleScript() {
+  var currentStatus = getScriptStatus();
+  setScriptStatus(!currentStatus);
+  SpreadsheetApp.getActive().toast(
+    `Script telah ${!currentStatus ? 'DIAKTIFKAN' : 'DINONAKTIFKAN'}`,
+    'Status Script'
+  );
+}
